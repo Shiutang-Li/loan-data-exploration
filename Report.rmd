@@ -1,0 +1,780 @@
+Prosper Loan Data Set Exploration by Shiu-Tang Li
+========================================================
+
+###1. Introduction 
+In this report, I will study the Prosper Loan Data Set, which is a data set that contains 113,937 loan records and 81 variables, and these variables include loan amount, current loan status, borrower income, borrower employment status, borrower credit history, and so on. The following table gives the reader a glimpse on the data that we will be studying, which contain 13 of these 81 variables in the data set.
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+
+```{r packages}
+# load all libraries, data, and functions
+library(ggplot2)
+library(dplyr)
+library(Hmisc) # for "cut2" function
+library(GGally)
+
+data_frame <- read.csv("prosperLoanData.csv")
+df <- data_frame[,c("Term",
+                    "LoanStatus",
+                    "BorrowerAPR", 
+                    "ProsperScore", 
+                    "ListingCategory..numeric.",
+                    "Occupation",
+                    "EmploymentStatus",
+                    "CreditScoreRangeLower",
+                    "CreditScoreRangeUpper",
+                    "AmountDelinquent",
+                    "DelinquenciesLast7Years",
+                    "IncomeVerifiable",
+                    "StatedMonthlyIncome",
+                    "LoanOriginalAmount") ]
+names(df)[names(df)=="ListingCategory..numeric."] <- "ListingCategory"
+
+ratio <- function(vector, value){
+# --------
+# Computes the ratio of a given value in a vector    
+# Args: Vector, Value
+# Return: Ratio if the vector has length > 1; -1 if the vector has length 0  
+# --------
+  if (length(vector) >0) {
+    r = (sum(vector == value)  / length(vector))
+  return(r)
+  }
+  else{
+    return(-1)
+  }
+}
+```
+
+```{r themes}
+# This code chunk contains all theme settings for later use
+
+# Theme1: Centers the title of the figure   
+Theme1 <- theme(plot.title = element_text(hjust = 0.5))
+# Theme2: make labels in x-axis vertical  
+Theme2 <- theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.3))
+```
+
+```{r}
+# Show the table structure first
+str(df)
+
+# Creating a column CreditScore which is the mean of CreditScoreRangeLower
+# and df$CreditScoreRangeUpper
+df$CreditScore <-  (df$CreditScoreRangeLower + df$CreditScoreRangeUpper) /2
+
+# Creating a column "Category" which stores the reason of the loan 
+df$Category[df$ListingCategory == "0"] <- 
+  "Not Available"
+df$Category[df$ListingCategory == "1"] <- 
+  "Debt Consolidation"
+df$Category[df$ListingCategory == "2"] <- 
+  "Home Improvement"
+df$Category[df$ListingCategory == "3"] <- 
+  "Business"
+df$Category[df$ListingCategory == "4"] <- 
+  "Personal Loan"
+df$Category[df$ListingCategory == "5"] <- 
+  "Student Use"
+df$Category[df$ListingCategory == "6"] <- 
+  "Auto"
+df$Category[df$ListingCategory == "7"] <- 
+  "Other"
+df$Category[df$ListingCategory == "8"] <- 
+  "Baby&Adoption"
+df$Category[df$ListingCategory == "9"] <- 
+  "Boat"
+df$Category[df$ListingCategory == "10"] <- 
+  "Cosmetic Procedure"
+df$Category[df$ListingCategory == "11"] <- 
+  "Engagement Ring"
+df$Category[df$ListingCategory == "12"] <- 
+  "Green Loans"
+df$Category[df$ListingCategory == "13"] <- 
+  "Household Expenses"
+df$Category[df$ListingCategory == "14"] <- 
+  "Large Purchases"
+df$Category[df$ListingCategory == "15"] <- 
+  "Medical/Dental"
+df$Category[df$ListingCategory == "16"] <- 
+  "Motorcycle"
+df$Category[df$ListingCategory == "17"] <- 
+  "RV"
+df$Category[df$ListingCategory == "18"] <- 
+  "Taxes"
+df$Category[df$ListingCategory == "19"] <- 
+  "Vacation"
+df$Category[df$ListingCategory == "20"] <- 
+  "Wedding Loans"
+```
+The main goal of this report is to apply exploratory data analysis techniques in order to analyze what types of borrowers will most likely complete a loan / fail to complete a loan. 
+
+####1.1 The structure of this report 
+
+In Section 2, I study a few individual variables, giving the reader some knowledge about the data set that we will be studying. In Section 3, I study how other factors influence the LoanStatus vairable, and also see if there're connections between other variables. In Section 4, I perform multivariate analysis on a few variables at the same time, to see if a few different factors are combined together, could some interesting information be revealed from the data set?  In Section 5, a few interesting plots are selected as the conclusion to this report, and Section 6 contains some thoughts of this whole project. 
+
+###2. Univariate analysis
+
+The variables I investigate in this report can be classfied into three categories: (1) background information of borrowers (2) current loan information (3) result (is the loan completed or not). Let's have a look at some of these variables.
+
+####2.1 background information of borrowers
+
+**2.1.1. Occupation**
+
+The following picture shows the number of applications by occupation. There're 68 occupations including an empty occupation, and the top 36 occupations account for 95% of the total applications. We can see many applicants choose "Others", which could be that they're unemployed or they don't want to disclose their personal information. 
+
+```{r}
+# Keep 95% of the data, discarding occupations with fewer loan applications
+
+df2 <- df  %>% group_by(Occupation) %>% 
+               summarise(tot = sum(!is.na(Occupation)))
+df3 <- df2  %>% arrange(desc(tot))
+df3$accumulated_sum <- cumsum(df3$tot)
+df4<- subset(df3, accumulated_sum <= 0.95*nrow(df)) 
+
+# ordered by number of loans in each occupation
+ggplot(df4, 
+       aes(x = reorder(Occupation, -tot), y = tot)) +
+geom_bar(stat = "identity")+ 
+ggtitle("Loan applications by occupation")+
+xlab("Occupation")+
+ylab("Number of loan applications")+
+Theme1 + Theme2
+```
+
+**2.1.2. Purpose of a loan**
+
+People apply for loan for various reasons. The following figure shows the reader the distributions of it.
+
+```{r}
+# ordered by number of loans for each reason
+df2 <- df  %>% group_by(Category) %>% summarise(tot = sum(!is.na(Category)))
+
+ggplot(df2, 
+       aes(x = reorder(Category, -tot), y = tot)) +
+geom_bar(stat = "identity")+ 
+ggtitle("Loan applications by loan purposes")+
+xlab("Loan purposes")+
+ylab("Number of loan applications")+
+Theme1 + Theme2
+```
+
+**2.1.3. Credit scores** 
+
+Below is the credit score distribution of all loan applications. It's the mean of two variables "CreditScoreRangeLower" and "CreditScoreRangeUpper" in the data set. These scores are provided by a consumer credit rating agency.  I have removed 133 loan records with credit score 9.5 and 590 records with missing values in the following figure.
+
+```{r}
+summary(df$CreditScore)
+df2 <- df[!is.na(df$CreditScore) & (df$CreditScore != 9.5),]
+ggplot(df2, 
+       aes(x = CreditScore)) +
+geom_histogram(binwidth = 10)+ 
+ggtitle("Credit score distribution")+
+Theme1
+```
+
+**2.1.4. Stated monthly income**
+
+There's one person in the data set reported that he / she has a monthly income of 1750000 dollars. I assume that this is a prank and removed it by discarding the top 0.5% of the data. 
+
+```{r}
+summary (df$StatedMonthlyIncome )
+
+ggplot(df, 
+       aes(x = StatedMonthlyIncome))+
+geom_histogram( col = 'red',binwidth = 500)+
+xlim(0,25000)+ 
+ggtitle("Stated Monthly Income distibution")+
+Theme1
+```
+
+**2.1.5. Employment status**
+
+There're 9 different employment status, including "employed", "not employed", "full-time", "part-time", ... and so on. Note that there're ambiguous status like empty status, "not available", and "others".
+
+```{r}
+ggplot(df, aes(x = EmploymentStatus))+
+geom_bar()+
+ggtitle("Loan applications by employment status")+
+Theme1
+```
+
+**2.1.6. Number of delinquencies in last 7 years**
+
+Out of the 113,937 applications, there're 76,439 applications without delinquencies in the last 7 years. The distribution of applications with at least 1 delinquency record is shown as follows (including the summary statistics for these 36,508 records). The blue vertical line indicates the average of it (including the records of zero delinquencies).
+
+```{r}
+df2 <- subset(df, 1<= DelinquenciesLast7Years & DelinquenciesLast7Years <= 100)
+summary(df2$DelinquenciesLast7Years)
+ggplot(df2, aes(x = DelinquenciesLast7Years))+
+geom_histogram(binwidth = 1, col = 'red')+ 
+geom_vline(xintercept = mean(df$DelinquenciesLast7Years, na.rm = TRUE), 
+           colour = "blue")+
+ggtitle("Distribution of delinquencies in last 7 years")+
+Theme1
+```
+
+**2.1.7. Delinquency amount (in dolloars) when the credit file is pulled**
+
+Out of the 113,937 loan records, there're 7622 missing values, and 16,497 records with non-zero delinquency amounts. For theses 16,497 records, the summary and distribution are given as follows.
+
+```{r}
+# discarding rows with missing values, and value 0
+df2 <- df[!is.na(df$AmountDelinquent), ]
+df3 <- subset(df2, AmountDelinquent != 0 )
+
+summary(df3$AmountDelinquent)
+
+ggplot(df3, 
+       aes(x = AmountDelinquent+1 ))+
+geom_histogram(col ='red',
+               bins = 100)+ 
+scale_x_log10(breaks = c(100,500,1000,2000,5000,10000, 20000))+
+ggtitle("Delinquency amount distribution")+
+xlab("log10(AmountDelinquent + 1)")+
+Theme1
+
+```
+
+####2.2 Current loan information
+
+**2.2.1 Loan terms**
+
+There're 3 different loan terms, 12, 36, or 60 months. 
+
+```{r}
+# Change "Term" into categorical variable
+df$Term <- as.factor(df$Term)
+table(df$Term)
+ggplot(df, aes(x = Term))+
+geom_bar()+
+ggtitle("Loan applications by term length")+
+Theme1
+```
+
+**2.2.2 Total loan amount**
+
+The following figure shows the distribution of the original loan amount. The blue vertical line indicates the average.
+
+```{r}
+summary(df$LoanOriginalAmount)
+ggplot(df, 
+       aes(x = LoanOriginalAmount))+
+geom_histogram(col = 'red', 
+               binwidth = 500)+ 
+geom_vline(xintercept = mean(df$LoanOriginalAmount), colour = "blue")+
+ggtitle("Distribution of loan amount")+
+Theme1
+```
+
+**2.2.3 Borrower's APR (annual percentage rate)**   
+
+The following figure shows the distribution of the borrower's APR. The blue vertical line indicates the average. 25 records of missing values (out of 113,937 records) are removed.
+
+```{r}
+summary(df$BorrowerAPR)
+
+df2 <- df[!is.na(df$BorrowerAPR), ]
+ggplot(df2, 
+       aes(x = BorrowerAPR))+
+geom_histogram(col = 'red',
+               binwidth = 0.005)+ 
+geom_vline(xintercept = mean(df2$BorrowerAPR), colour = "blue")+
+ggtitle("Distribution of borrower's APR")+
+Theme1
+```
+
+####2.3 Loan Status
+
+There're 12 different status of a loan, as shown in the following table. (log base 10 transformation is applied to 'count')
+
+```{r}
+# Change "LoanStatus" into categorical variable
+df$LoanStatus <- as.factor(df$LoanStatus)
+table(df$LoanStatus)
+ggplot(df, 
+       aes(x = LoanStatus))+
+geom_bar()+
+scale_y_log10()+
+ylab('log10(count)') +
+ggtitle("Loan applications loan status")+
+Theme1 + Theme2
+```
+
+In this report, I create another variable "LoanStatus2" to combine loan status. "Chargedoff" and "Defaulted" are combined into a new status "Bad\_ debt",  and "Completed" and "FinalPaymentInProgress" are combined into "Good\_ debt". The data with other labels are negelected (55289 loan records are left). The good debt ratio is 0.69234.
+
+```{r}
+# Create a new data frame that has a new "LoanStatus2" variable. new_df only contain 55289 rows.
+new_df <- subset(df, LoanStatus == "Chargedoff" | 
+                     LoanStatus == "Defaulted" |
+                     LoanStatus == "Completed" | 
+                     LoanStatus =="FinalPaymentInProgress")
+new_df$LoanStatus2[new_df$LoanStatus == "Chargedoff"]<- "Bad_debt"
+new_df$LoanStatus2[new_df$LoanStatus == "Defaulted"]<- "Bad_debt"
+new_df$LoanStatus2[new_df$LoanStatus == "Completed"]<- "Good_debt"
+new_df$LoanStatus2[new_df$LoanStatus == "FinalPaymentInProgress"]<- "Good_debt"
+```
+
+```{r}
+table(new_df$LoanStatus2)
+ggplot(new_df, 
+       aes(x = LoanStatus2))+
+geom_bar()+
+ggtitle("Loan applications by good / bad dept")+
+Theme1 + Theme2
+```
+
+###3. Bivariate analysis
+
+####3.1 Plots that involve loan status
+
+**3.1.1 How credit score affects loan status** 
+
+The following figures compare the distribution of credit scores by loan status. From the ratio plot we can see the credit score is very helpful for us to judge whether or not a loan will be completed or defaulted. I have removed  133 loan records with credit score 9.5 and 590 records with missing values. 
+
+```{r}
+# remove missing values + outliers
+new_df2 <- new_df[(new_df$CreditScore != 9.5) & !is.na(new_df$CreditScore), ]
+
+ggplot(new_df2, 
+       aes(x = CreditScore)) +
+geom_histogram(binwidth = 10) +
+ggtitle("Comparison of credit score distribution by loan status")+
+facet_grid(LoanStatus2~.)+
+Theme1
+
+ggplot(new_df2, 
+       aes(x = CreditScore, 
+       fill = LoanStatus2))+
+geom_histogram(position =  "fill", 
+               binwidth = 10)+
+ggtitle("Good debt / all debt ratio plot by Credit scores")+
+ylab("Good debt ratio")+
+Theme1
+```
+
+**3.1.2  Is ProsperScore accurate in predicting loan status?** 
+
+The following figures compare the distribution of Prosper Score (A custom risk score built using historical Prosper data) by loan status. It seems that the credit score is also helpful for us to judge whether or not a loan will be completed or defaulted. 
+
+```{r}
+new_df$ProsperScore2 <- as.factor(new_df$ProsperScore)
+ggplot(new_df, 
+       aes(x = ProsperScore2)) +
+geom_bar() +
+ggtitle("Comparison of Prosper Score distribution by loan status")+
+facet_grid(LoanStatus2~.)+
+Theme1
+
+ggplot(new_df, 
+       aes(x = ProsperScore2, 
+       fill = LoanStatus2))+
+geom_bar(position =  "fill")+
+ggtitle("Good debt / all debt ratio plot by Prosper Score")+
+ylab("Good debt ratio")+
+Theme1
+```
+
+**3.1.3  Does stated monthly income determine loan status?**
+
+The following figures compare the distribution of stated monthly income by loan status. It doesn't seem that stated monthly income is useful in determining the loan status.
+
+In the ratio plot, the ratio fluctuates a lot when stated monthly income is greater than $15000. I think this is because when don't have enough data in these cases so the variance of the data is larger.
+
+
+```{r}
+ggplot(new_df, 
+       aes(x = StatedMonthlyIncome))+
+geom_histogram(col = 'red',
+               binwidth = 500)+
+xlim(0,25000)+
+ggtitle("Comparison of stated monthly income distribution by loan status")+
+facet_grid(LoanStatus2~.)+
+Theme1  
+
+ggplot(new_df, 
+       aes(x = StatedMonthlyIncome, 
+       fill = LoanStatus2))+
+geom_histogram(position = "fill", 
+               binwidth = 500, 
+               col = "black")+
+ggtitle("Good debt / all debt ratio plot by stated monthly income")+
+ylab("Good dept ratio")+
+xlim(0,25000)+
+Theme1
+```
+
+**3.1.4  Does employment status determine loan status?**
+
+Some information shown in the ratio plot below is that the records of which that employment status is "Other" or
+"Not available" has quite low good debt rates. This can be viewed as a warning sign.
+```{r}
+ggplot(new_df, 
+       aes(x = EmploymentStatus, fill = LoanStatus2))+
+geom_bar(position =  "fill")+
+ggtitle("Good debt / all debt ratio plot by employment status")+
+Theme1 + Theme2
+```
+
+**3.1.5  Is loan amount a good indicator to show loan status?**
+
+From the ratio plot the loan amount doesn't seem like a good indicator to help identify loan status. 
+
+Something interesting is that there're 18 record with loan amount greater than $25000, and these loans are all completed. My guess is to give such a high amount of loan to borrowers, the loan company must have checked very carefully.
+
+```{r}
+ggplot(new_df, 
+       aes(x = LoanOriginalAmount))+
+geom_histogram(col = 'red', 
+               binwidth =500)+
+facet_grid(LoanStatus2~.)+
+ggtitle("Comparison of loan amount distribution by loan status")+
+Theme1  
+
+ggplot(new_df, 
+       aes(x = LoanOriginalAmount, 
+       fill = LoanStatus2))+
+geom_histogram(position =  "fill", 
+               binwidth = 500, 
+               col = "black")+
+ggtitle("Good debt / all debt ratio plot by loan Amount")+
+ylab("Good debt ratio")+
+Theme1
+```
+
+**3.1.6  Is loan term a good indicator to show loan status?**
+
+From the figure below we can see when the term length is low it's very likely that the loan will be completed. However, there're not many cases where the term length is 12 months (The reader can check the univariate plot Section).
+
+```{r}
+ggplot(new_df, 
+       aes(x = Term, fill = LoanStatus2))+
+geom_bar(position =  "fill")+
+ggtitle("Good debt / all debt ratio plot by term length")+
+ylab("Good debt ratio")+
+Theme1
+```
+
+**3.1.7  Is the number of delinquencies in last 7 years of borrowers helpful in determining loan status?**
+
+We did see when the number of delinquencies is smaller, the good debt ratio is higher. But when the number of delinquencies is high, it's kind of diffcult to predit the good debt ratio. Again it might be because we have little data when the number of delinquenciesis high, so the variance of the data in this case is high.
+
+```{r}
+ggplot(subset(new_df, 
+              1<= DelinquenciesLast7Years & DelinquenciesLast7Years<= 100), 
+              aes(x = DelinquenciesLast7Years))+
+geom_histogram(binwidth = 1, 
+               col = 'red')+
+facet_grid(LoanStatus2~.) +
+ggtitle("Comparison of the number of delinquencies by loan status")+
+Theme1
+
+ggplot(new_df, 
+       aes(x = DelinquenciesLast7Years, 
+       fill = LoanStatus2))+
+geom_histogram(position =  "fill", 
+               binwidth = 1, 
+               col = "black")+
+ggtitle("Good debt / all debt ratio plot by loan status")+
+ylab("Good debt ratio")+
+Theme1
+```
+
+Let's look at the box plot instead. Among the people who have delinquencies records, those who turn out to be bad debts tend to have higher delinquency numbers, but the trend is not obvious.
+
+```{r}
+new_df2 <- subset(new_df, 
+              1<= DelinquenciesLast7Years & DelinquenciesLast7Years<= 100)
+ggplot(new_df2,
+       aes(y = DelinquenciesLast7Years, x = LoanStatus2))+
+geom_boxplot()+
+coord_flip()+
+ggtitle("Delinquency distribution by loan status")+
+Theme1
+```
+
+Let's do a t-test to see if the difference of the number of delinquencies is significant. I assume the loans of good debts and bad debts are independent, normally distributed, with different mean and variance, so the Welch's t test is applicable. From the test below we can see the p-value for the two groups (good debts and bad debts) having the same mean is super low, and this implies the mean is very likely to be different. But is the difference huge? Well, as the reader can see in the t test, a 99% confidence interval for the mean difference is (-2.0809152, -0.9404948), so the difference is actually quite small (but there is a difference though).
+
+```{r}
+#length(new_df2[new_df2$LoanStatus2 == "Good_debt", 
+#               ]$DelinquenciesLast7Years)
+#length(new_df2[new_df2$LoanStatus2 == "Bad_debt",
+#               ]$DelinquenciesLast7Years)
+x <- new_df2[new_df2$LoanStatus2 == "Good_debt", 
+             ]$DelinquenciesLast7Years
+y <- new_df2[new_df2$LoanStatus2 == "Bad_debt", 
+             ]$DelinquenciesLast7Years
+t.test(x,y,mu = 0, conf.level = 0.99)
+```
+
+**3.1.8  Borrower's APR vs. loan status**
+
+Let's look at borrower's APR distribution with different loan status (with full 12 status in detail). The reader can see higher APR is linked to higher default rate. But is it higher APR that causes higher default rate? Or is it because group of higher default rate usually have lower credit scores, so they receive higher APR when they start a loan?
+
+```{r}
+df$LoanStatus <- as.factor(df$LoanStatus)
+
+ggplot(df[!is.na(df$BorrowerAPR), ],
+       aes(x = LoanStatus, y = BorrowerAPR))+
+geom_boxplot()+
+coord_flip()+
+ggtitle("Borrower's APR distribution with different loan status")+
+Theme1
+```
+
+####3.2 plots that don't involve loan status
+
+**3.2.1 Borrower's APR versus loan amount**
+
+The following scatter plot shows the joint distribution of Borrower's APR and loan amount. The data is focused on certain loan amounts, and small loan amounts, with Borrower's APR lying between 0.1 and 0.3.
+
+```{r}
+ggplot(df[!is.na(df$BorrowerAPR), ],
+       aes(x = BorrowerAPR, y = LoanOriginalAmount))+
+geom_point(alpha = 0.05,
+           position = position_jitter(width = 0.005, 
+                                      height = 300))+
+ggtitle("The join distribution of Borrower's APR and loan amount")+
+Theme1
+```
+
+**3.2.2 Borrower's APR versus credit scores**
+
+We can see there's a linear trend that fits the data. Higher credit scores are accompannied by lower APRs.
+
+```{r}
+ggplot(df[!is.na(df$CreditScore) & (df$CreditScore > 20), ],
+       aes(x = CreditScore, y = BorrowerAPR))+
+geom_point(alpha = 0.3, 
+           shape = ".",
+           position = position_jitter(width = 10, 
+                                      height = 0.005))+
+geom_smooth(method = "lm", se = FALSE)+
+ggtitle("The join distribution of Borrower's APR and credit scores")+
+Theme1
+```
+
+####3.3 Discussions
+
+**3.3.1 Talk about some of the relationships you observed in this part of the investigation. How did the feature(s) of interest vary with other features in the dataset?
+
+Say, from the previous section,
+loan term length is short -> good debt ratio gets high
+good debt ratio gets high <-> credit score is high  
+
+**3.3.2 Did you observe any interesting relationships between the other features?
+
+Most interesting relationships I found was about how the loan status variable interact with other variables. There are some interesting connections between borrower's APR and other variables, as shown in the plots.
+
+###4. Multivariate analysis
+
+####4.1 Scatterplot matrix between continuous features used in this plot
+
+First I include the scatterplot matrix of continuous features used in this report. As the reader can see not much information is obtained from this matirx: the scatterplots have to be tweaked; correlation is low. We have to put some constraints on the data set in order to dig more information.
+
+```{r}
+# delete outliers, missing values
+df2 <- df[!is.na(df$BorrowerAPR) & 
+          !is.na(df$CreditScore) & 
+          df$CreditScore != 9.5 & 
+          !is.na(df$DelinquenciesLast7Years) &
+          !is.na(df$AmountDelinquent) & 
+          (df$StatedMonthlyIncome <= 
+           quantile(df$StatedMonthlyIncome, 0.995)), ] 
+
+# Scatterplot matrix
+ggpairs(df2[, c("BorrowerAPR", "CreditScore" , "StatedMonthlyIncome", "LoanOriginalAmount", "AmountDelinquent", "DelinquenciesLast7Years")])
+```
+
+####4.2  incomeVerifiable, loan status, and loan amount
+I'm curious about the effect of "IncomeVerifiable" variable (The borrower indicated they have the required documentation to support their income) on the loan amount by loan status. The reader can find that if the income of the borrower can be verified, the loan amount doesn't differ much. However, if the income of the borrower CANNOT be verified, the loan amount of the bad debt record is larger than good debt records.  
+
+```{r}
+ggplot(new_df, 
+       aes(x = LoanStatus2, y= LoanOriginalAmount))+
+geom_boxplot()+
+facet_grid(.~IncomeVerifiable)+
+ggtitle("How incomeVerifiable variable / loan status affect loan amount")+
+Theme1
+```
+
+####4.3 CreditScore, ProsperScore, and loan status
+The next thing I'm curious about is that if I combine two predictors (CreditScore, ProsperScore) together, would it give me a clearer idea to guess loan status? So I started with a scatter plot of CreditScore and ProsperScore, faceted by LoanStatus variable.
+
+```{r}
+ggplot(new_df, 
+       aes(x = CreditScore, y= ProsperScore))+
+geom_point(alpha = 0.05, 
+           position = position_jitter(width = 10, height = 0.4))+
+xlim(550,820) + 
+facet_grid(LoanStatus2~.)+
+ggtitle("Scatter plot of CreditScore and ProsperScore, faceted by loan status ")+
+Theme1
+```
+
+From the figure above I can roughly tell good debt racords focus more on higher credit scores. But what we want to know is to find the trend of good debt ratio. So I break both variables into quantile groups, and make a heat map. The color indicates good debt ratio.
+
+We can see from figure that trend is quite clear. The major issue is the buttom right corner, where credit score is high but prosper score is low. The colors fluctuate a lot in that region. I think one reason to explain this is that we don't have enough data for those tiles (As the reader can find in the previous scatter plots).
+
+```{r}
+new_df2 <- new_df[!is.na(new_df$ProsperScore) & 
+!is.na(new_df$CreditScore),]
+
+new_df2$CreditScore2 <- cut2(new_df2$CreditScore, g = 20)
+
+new_df2$ProsperScore2 <- cut2(new_df2$ProsperScore, g = 20)
+
+new_df3 <- new_df2 %>% group_by(CreditScore2, ProsperScore2) %>%    
+                       summarise(good_debt_ratio = 
+                                 ratio(LoanStatus2, "Good_debt"))
+
+ggplot(new_df3, 
+       aes(x=CreditScore2,y=ProsperScore2))+ 
+geom_tile(aes(fill = good_debt_ratio))+
+coord_flip()+
+scale_fill_gradient(low = "black", high = "yellow")+
+ggtitle("Heat map of CreditScore and ProsperScore")+
+Theme1
+```
+
+####4.4 AmountDelinquent, DelinquenciesLast7Years, and loan status
+
+This time I'm trying to use "AmountDelinquent" and "DelinquenciesLast7Years" varibles to predict good debt ratio, and I create a heat map. For both variables I'm breaking them into equal quantile groups, trying to balance the weight as much as I can. The color indicates good debt ratio.
+
+But unfortunately it doesn't work pretty well. The reader can find that the color fluctuates a lot. I would say on the buttom left corner the average good debt ratio is slightly higher, but other than that we can barely find other useful information.
+
+```{r}
+new_df2 <- new_df[!is.na(new_df$AmountDelinquent) & 
+                    (new_df$AmountDelinquent<=10000) & 
+                    (1<= new_df$AmountDelinquent) &               
+                    (!is.na(new_df$DelinquenciesLast7Years)) &                 
+                    (new_df$DelinquenciesLast7Years >=1), ]
+
+new_df2$AmountDelinquent2 <- cut2(new_df2$AmountDelinquent,g = 15)
+
+new_df2$DelinquenciesLast7Years2 <- cut2(new_df2$DelinquenciesLast7Years,g = 15)
+
+new_df3 <- new_df2 %>% group_by(AmountDelinquent2, DelinquenciesLast7Years2) %>%
+                       summarise(good_debt_ratio = 
+                                 ratio(LoanStatus2, "Good_debt"))
+
+ggplot(new_df3, 
+       aes(x=AmountDelinquent2, y=DelinquenciesLast7Years2))+ 
+geom_tile(aes(fill = good_debt_ratio))+
+scale_fill_gradient(low = "black", high = "yellow")+
+ggtitle("Heat map of AmountDelinquent and DelinquenciesLast7Years")+
+Theme1 + Theme2
+
+```
+
+
+####4.5 Discussion
+
+**4.5.1 Talk about some of the relationships you observed in this part of the investigation. Were there features that strengthened each other in terms of looking at your feature(s) of interest?
+
+Say when I combined credit scores and prosper scores, I have a clearer picture about what good debts and bad debts look like.
+
+**4.5.2 Were there any interesting or surprising interactions between features?
+
+The example in Setion 6.1 showed the vairable "incomeVerifiable" helped us when we study loan amount distributions. The loans which income cannot be verified, tend to have a larger loan amount when it's gonna defaulted.
+
+###5. Final Plots
+
+The three plots that reveals the most interesting information to the reader (in my opionion) are listed here.
+
+###5.1 a univariate plot
+
+I would condsider giving higher priorities to those borrowers who's term length is 12 months. Although there're not many loan applicants having 12 months term length, it's still a useful feature to help sort out good applicants.
+
+```{r}
+new_df$Term <- as.factor(new_df$Term)
+ggplot(new_df, 
+       aes(x = Term, fill = LoanStatus2))+
+geom_bar(position =  "fill")+
+xlab("Term length in months")+
+ylab("Good debt / all debt ratio")+  
+ggtitle("Good debt / all debt ratio plot by term length")+
+guides(fill = guide_legend(title = "loan status", title.position = "top"))+
+Theme1
+```
+
+
+###5.2 a bivariate plot
+
+This plot distinguishes the loan status groups by examining borrow's APR. This helps us to judge which group a loan record may belong to by checking the borrow's APR.
+
+```{r}
+df$LoanStatus <- as.factor(df$LoanStatus)
+
+ggplot(df[!is.na(df$BorrowerAPR), ],
+       aes(x = LoanStatus, y = BorrowerAPR))+
+geom_boxplot()+
+coord_flip()+
+ylab("Borrower's annual percentage rate (APR)")+  
+xlab("Loan Status")+
+ggtitle("Borrower's APR distribution with different loan status")+
+Theme1
+```
+
+If we'd like to compare each group, we can run a t-test to see what's going on. Say, "Completed" and "Chargedoff":
+
+```{r}
+x <- df[!is.na(df$BorrowerAPR) & df$LoanStatus == "Completed", ]$
+        BorrowerAPR
+y <- df[!is.na(df$BorrowerAPR) & df$LoanStatus == "Chargedoff", ]$
+        BorrowerAPR
+t.test(x,y,mu = 0)
+```
+
+With 95% confidence level, the APR of the "Completed" group is lower than the "Chargedoff" group by 4.73% to 5.07%.
+
+###5.3 a multivariate plot
+
+I would wave good bye to those with low prosper score + low credit scores. It seems that the prosper score is doing a better job than credit scores, because those with low credit scores and high prosper scores still have a good debt ratio. Those with low prosper scores but high credit scores are the tricky ones. We need more information to decide whether the company should lend money to these guys. These guys may know how to cheat on the credit score system!
+
+```{r}
+new_df2 <- new_df[!is.na(new_df$ProsperScore) & 
+                  !is.na(new_df$CreditScore), ]
+
+new_df2$CreditScore2 <- cut2(new_df2$CreditScore, g = 20)
+
+new_df2$ProsperScore2 <- cut2(new_df2$ProsperScore, g = 20)
+
+new_df3 <- new_df2 %>% group_by(CreditScore2, ProsperScore2) %>%  
+                       summarise(good_debt_ratio = 
+                                 ratio(LoanStatus2, 
+                                       "Good_debt"))
+
+ggplot(new_df3, 
+       aes(x=CreditScore2,y=ProsperScore2))+ 
+geom_tile(aes(fill = good_debt_ratio))+
+scale_fill_gradient(low = "black", high = "yellow")+
+xlab("Credit score splitted into 11 quantile groups")+  
+ylab("Prosper score, from 1 (lowest) to 11 (highest)")+
+ggtitle("Heat map of credit score and prosper score, by good debt / all debt ratio")+
+guides(fill = guide_legend(title = "good debt / all debt", title.position = "top"))+
+Theme1
+```
+
+###6. Reflection
+
+#### Advantages and drawbacks
+
+In this report I tried various plots to link a few variables to the loan status variable, and I did find some interesting connections. 
+
+But there're still many possible relations which are not discovered, and for some of the connections I found I may not have chosen the best way to present the results. Also, I need think more carfully when later I try to put these thoughts together into a prediction model.  
+
+#### Technical limitations
+
+When I use ggplot to create most of my plots, there're some plots that I want to make but I still don't know how to do it using ggplot. Say, I don't know how to create a histogram and a frequency polygon on the same graph. Or, I don't know how to create a bar plot, that for each x (discrete) values, it maps to two different feature values distinguished by colors. I don't know questions like this can still be done with ggplot, or I have to use other tools.  
+
+#### What can be done next
+
+If I have more time on this project, I would probably try if there's any specific combinations of variables that give super high good debt ratio or bad debt ratios.
+
+One thing I can think about now is that maybe we can design a way to detect cheaters. This can be done, say, by comparing the information of the occupations, monthly income, and loan purposes to see if it's reasonable. Once we have a good cheater detection system, we can use it to analyze the good debt ratio of these "cheaters".  
+
+Another thing I can think about is that all the above analysis is based on quantitative analysis. If we can somehow ask the borrower to provide a short statement on why they need to borrow money, and how they plan to return the money, maybe this type of  qualitative analysis could help too, or may even do a better job than quantitative analysis.
