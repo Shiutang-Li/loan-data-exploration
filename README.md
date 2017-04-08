@@ -8,4 +8,4 @@ In this project I'll apply exploratory data analysis on prosper loan data set, t
 
 * The data set I study on is prosperLoanData.csv
 
-* To view the description of the variables of prosperLoanData.csv, 
+* To view the description of the variables of prosperLoanData.csv, open Data_Variable_Definitions.pdf
