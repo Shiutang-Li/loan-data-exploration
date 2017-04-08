@@ -1,6 +1,11 @@
-# Testrepo_1
-This is a testing repository to get myself familiar with Github
+# Propsper loan data set exploration
 
-Can type a few more lines here
+In this project I'll apply exploratory data analysis on prosper loan data set, to help the reader develope intuitions on how different factors in the data set influence the loan status variable (completed, defaulted, ...). It contains a univariate analysis section, a bivariate analysis section, a multivariate analysis section, and final plots and thoughts. Graphical analysis in this project are done using R ggplot2 package.
 
-* These are updates from another branch
+* To view the R markdown file, open report.rmd
+
+* To view the contents, open report.html
+
+* The data set I study on is prosperLoanData.csv
+
+* To view the description of the variables of prosperLoanData.csv, 
