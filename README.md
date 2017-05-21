@@ -1,11 +1,25 @@
 # Propsper loan data set exploration
 
+## Introduction
+
 In this project I'll apply exploratory data analysis on prosper loan data set, to help the reader develope intuitions on how different factors in the data set influence the loan status variable (completed, defaulted, ...). It contains a univariate analysis section, a bivariate analysis section, a multivariate analysis section, and final plots and thoughts. Graphical analysis in this project are done using R ggplot2 package.
 
-* To view the R markdown file, open report.rmd
+**The data set**: [prosperLoanData.csv](https://github.com/Shiutang-Li/loan-data-exploration/blob/master/prosperLoanData.csv)  
 
-* To view the contents, open report.html
+**Full description of the variables**: [Data_Variable_Definitions.pdf](https://github.com/Shiutang-Li/loan-data-exploration/blob/master/Data_Variable_Definitions.pdf)  
 
-* The data set I study on is prosperLoanData.csv
+## View report
 
-* To view the description of the variables of prosperLoanData.csv, open Data_Variable_Definitions.pdf
+* html: [Final_proj.html](https://github.com/Shiutang-Li/loan-data-exploration/blob/master/Report.html)  
+
+## Dependencies
+
+R 3.3.1
+library(ggplot2)  
+library(dplyr)  
+library(Hmisc)  
+library(GGally)  
+
+## Run the code
+
+Install depedencies and run [report.rmd](https://github.com/Shiutang-Li/loan-data-exploration/blob/master/Report.rmd)
