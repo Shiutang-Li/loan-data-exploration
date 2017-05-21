@@ -22,4 +22,4 @@ library(GGally)
 
 ## Run the code
 
-Install depedencies and run [report.rmd](https://github.com/Shiutang-Li/loan-data-exploration/blob/master/Report.rmd)
+Install depedencies and run [report.rmd](https://github.com/Shiutang-Li/loan-data-exploration/blob/master/Report.rmd) (RStudio knit html)
