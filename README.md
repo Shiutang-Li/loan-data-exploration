@@ -14,7 +14,7 @@ In this project I'll apply exploratory data analysis on prosper loan data set, t
 
 ## Dependencies
 
-R 3.3.1
+R 3.3.1  
 library(ggplot2)  
 library(dplyr)  
 library(Hmisc)  
